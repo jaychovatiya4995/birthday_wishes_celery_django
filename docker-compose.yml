@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  redis:
+    image: "redis:alpine"
+  db:
+    container_name: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data:cached
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=demo
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+
+  web:
+    restart: always
+    container_name: birthdaywishes_django
+    build: .
+    command: >
+      sh -c "python3 manage.py migrate &&
+             python3 manage.py runserver 0.0.0.0:8000"
+
+    volumes:
+      - .:/code
+  
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db
+
+  celery:
+    build: .
+    #command: celery -A foresitecore worker -l info
+    command: celery -A birthday_wishes worker -l WARNING 
+    volumes:
+      - .:/code
+    depends_on:
+      - redis
+  celery-beat:
+    build: .
+    #command: celery -A foresitecore beat -l info
+    command: celery -A birthday_wishes beat -l WARNING
+    volumes:
+      - .:/code
+    depends_on:
+      - redis
+
+volumes:
+  db-data:
